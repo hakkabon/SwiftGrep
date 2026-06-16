@@ -31,7 +31,7 @@ struct SwiftGrep: AsyncParsableCommand {
 
     mutating func run() async throws {
         // 1. Parse the string pattern into your AST
-        let ast = try RegexParser.parse(pattern)
+        let ast = try RegexParser().parse(pattern)
         
         // 2. Initialize your NFA / Matching Engine
         let engine = RegexEngine(ast)
