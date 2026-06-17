@@ -46,59 +46,78 @@ final class RegexAutomataTests: XCTestCase {
         XCTAssertFalse(Regex.backreference(id: 1).isNullable(env: [1: "a"]))
     }
     
-    // MARK: - 3. Dynamic Substring Matching
+    // MARK: - 3. Dynamic Substring Matching & Bounds
     
-    func testBasicSubstringMatching() {
+    func testBasicSubstringMatching() throws {
         // Pattern: "foo"
         let pattern = Regex.con(.symbol("f"), .con(.symbol("o"), .symbol("o")))
         let engine = RegexEngine(pattern)
         
-        // Should match inside a larger string (Substring matching)
-        XCTAssertNotNil(engine.firstMatch(in: "a foobar test"), "Engine should find 'foo' in the middle of a string")
-        XCTAssertNotNil(engine.firstMatch(in: "foo"), "Engine should match exact string")
+        let input1 = "a foobar test"
+        let match1 = try XCTUnwrap(engine.firstMatch(in: input1), "Engine should find 'foo' in the middle of a string")
+        // Verify the highlighted bounds exactly cover the word "foo"
+        XCTAssertEqual(String(input1[match1.range]), "foo")
+        
+        let input2 = "foo"
+        let match2 = try XCTUnwrap(engine.firstMatch(in: input2))
+        XCTAssertEqual(String(input2[match2.range]), "foo")
+        
         XCTAssertNil(engine.firstMatch(in: "foboar"), "Engine should reject non-matching string")
     }
     
-    func testAnyCharacterMatching() {
+    func testAnyCharacterMatching() throws {
         // Pattern: "a.c"
         let pattern = Regex.con(.symbol("a"), .con(.any, .symbol("c")))
         let engine = RegexEngine(pattern)
         
-        XCTAssertNotNil(engine.firstMatch(in: "abc"))
-        XCTAssertNotNil(engine.firstMatch(in: "aXc"))
+        let input1 = "xyz abc test"
+        let match1 = try XCTUnwrap(engine.firstMatch(in: input1))
+        XCTAssertEqual(String(input1[match1.range]), "abc")
+        
+        let input2 = "aXc"
+        let match2 = try XCTUnwrap(engine.firstMatch(in: input2))
+        XCTAssertEqual(String(input2[match2.range]), "aXc")
+        
         XCTAssertNil(engine.firstMatch(in: "ac"))
     }
     
     // MARK: - 4. Group Captures & Backreferences
     
-    func testSimpleCaptureGroup() {
+    func testSimpleCaptureGroup() throws {
         // Pattern: [1: ba*]
         let aStar = Regex.star(.symbol("a"))
         let baStar = Regex.con(.symbol("b"), aStar)
         let pattern = Regex.capture(id: 1, baStar)
         
         let engine = RegexEngine(pattern)
-        let match = engine.firstMatch(in: "test baaaa string")
         
-        XCTAssertNotNil(match)
-        XCTAssertEqual(match?[1], "baaaa", "Capture group 1 should capture 'baaaa'")
+        let input = "test baaaa string"
+        let match = try XCTUnwrap(engine.firstMatch(in: input))
+        
+        // Assert matched bounds
+        XCTAssertEqual(String(input[match.range]), "baaaa")
+        // Assert exact capture dictionary
+        XCTAssertEqual(match.captures[1], "baaaa", "Capture group 1 should capture 'baaaa'")
     }
     
-    func testNestedCaptureGroups() {
+    func testNestedCaptureGroups() throws {
         // Pattern: a[1:b[2:c]]
         let subcap = Regex.capture(id: 2, .symbol("c"))
         let cap = Regex.capture(id: 1, Regex.con(.symbol("b"), subcap))
         let pattern = Regex.con(.symbol("a"), cap)
         
         let engine = RegexEngine(pattern)
-        let match = engine.firstMatch(in: "xyzabc123")
+        let input = "xyzabc123"
+        let match = try XCTUnwrap(engine.firstMatch(in: input))
         
-        XCTAssertNotNil(match)
-        XCTAssertEqual(match?[1], "bc", "Outer capture group 1 should capture 'bc'")
-        XCTAssertEqual(match?[2], "c", "Inner capture group 2 should capture 'c'")
+        // Assert matched bounds
+        XCTAssertEqual(String(input[match.range]), "abc")
+        // Assert exact capture dictionaries (Fix applied here)
+        XCTAssertEqual(match.captures[1], "bc", "Outer capture group 1 should capture 'bc'")
+        XCTAssertEqual(match.captures[2], "c", "Inner capture group 2 should capture 'c'")
     }
     
-    func testBackreferenceMatching() {
+    func testBackreferenceMatching() throws {
         // Pattern: [1:a|b]\1 (Matches "aa" or "bb", but not "ab" or "ba")
         let aOrB = Regex.alt([.symbol("a"), .symbol("b")])
         let capture = Regex.capture(id: 1, aOrB)
@@ -106,8 +125,14 @@ final class RegexAutomataTests: XCTestCase {
         
         let engine = RegexEngine(pattern)
         
-        XCTAssertNotNil(engine.firstMatch(in: "xxaayy"), "Should match 'aa'")
-        XCTAssertNotNil(engine.firstMatch(in: "xxbbyy"), "Should match 'bb'")
+        let input1 = "xxaayy"
+        let match1 = try XCTUnwrap(engine.firstMatch(in: input1))
+        XCTAssertEqual(String(input1[match1.range]), "aa", "Should match 'aa' as a substring")
+        
+        let input2 = "xxbbyy"
+        let match2 = try XCTUnwrap(engine.firstMatch(in: input2))
+        XCTAssertEqual(String(input2[match2.range]), "bb", "Should match 'bb' as a substring")
+        
         XCTAssertNil(engine.firstMatch(in: "xxabyy"), "Should NOT match 'ab'")
         XCTAssertNil(engine.firstMatch(in: "xxbayy"), "Should NOT match 'ba'")
     }

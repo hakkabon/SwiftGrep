@@ -32,6 +32,7 @@ let package = Package(
         .executableTarget(
             name: "sgrep",
             dependencies: [
+                "SwiftGrep",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "Tokenizer", package: "GrammarTokenizer"),
             ]
