@@ -9,9 +9,7 @@ func testParserAST() async throws {
         // then expect backreference \2 (which requires 'c' again)
         let ast = try RegexParser.parse("a(b(c))\\2")
         
-        print(ast)
-        // Expected description formatting based on your AST:
-        // a[1:b[2:c]]\2
+        #expect("\(ast)" == "a[1:b[2:c]]\\2", "expected output from ast: a[1:b[2:c]]\\2")
         
     } catch {
         print("Failed to parse: \(error)")

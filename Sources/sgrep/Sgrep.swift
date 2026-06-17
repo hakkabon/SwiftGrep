@@ -29,7 +29,7 @@ struct SwiftGrep: AsyncParsableCommand {
     @Flag(name: .shortAndLong, help: "Invert the sense of matching, to select non-matching lines.")
     var invertMatch: Bool = false
 
-    public mutating func run() async throws {
+    mutating func run() async throws {
         // 1. Parse the string pattern into your AST
         let ast = try RegexParser.parse(pattern)
         

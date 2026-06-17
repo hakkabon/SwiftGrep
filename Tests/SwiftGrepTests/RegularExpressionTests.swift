@@ -174,4 +174,42 @@ final class RegexAutomataTests: XCTestCase {
             }
         }
     }
+    
+    // MARK: - Parser & Tokenizer Tests
+
+    func testTokenizer() throws {
+        let tokens = try Tokenizer.tokenize("a|b*\\1")
+        let expected: [Token] = [.char("a"), .pipe, .char("b"), .star, .backref(1), .eof]
+        XCTAssertEqual(tokens, expected)
+    }
+
+    func testParserComplex() throws {
+        // Test that nesting creates correct captures
+        let regex = try RegexParser.parse("(a(b))")
+        // Should be capture(1: concat(a, capture(2: b)))
+        XCTAssertEqual(regex.description, "[1:a[2:b]]")
+    }
+
+    // MARK: - Corner Case Matching
+
+    func testEmptyMatch() throws {
+        // The empty string regex ε should match the start of any line
+        let engine = RegexEngine(.epsilon)
+        let match = try XCTUnwrap(engine.firstMatch(in: "abc"))
+        XCTAssertEqual(match.range.lowerBound, match.range.upperBound)
+    }
+
+    func testGreedyVsNonGreedy() throws {
+        // Pattern a* should match "aaa" (longest) not "a"
+        let engine = RegexEngine(.star(.symbol("a")))
+        let match = try XCTUnwrap(engine.firstMatch(in: "aaa"))
+        XCTAssertEqual(String("aaa"[match.range]), "aaa")
+    }
+
+    func testBackrefMismatch() {
+        // [1:a|b]\1 : Match "ab" should fail
+        let pattern = try! RegexParser.parse("([ab])\\1")
+        let engine = RegexEngine(pattern)
+        XCTAssertNil(engine.firstMatch(in: "ab"))
+    }
 }

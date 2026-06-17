@@ -1,9 +1,48 @@
+# SwiftGrep: A Theoretical FSA Engine
+`SwiftGrep` is a command-line utility and library designed to demonstrate the application of **Antimirov’s Partial Derivatives** in finite state automata. Unlike traditional regex engines that rely on backtracking (which can lead to catastrophic performance on specific inputs), this engine constructs ε-free NFAs directly from regular expressions.
 
-This is a fantastic and deeply theoretical project. To fulfill your requirements, we need to bridge dynamic evaluation (for nested captures, backreferences, and substring matching) with formal Automata theory (Antimirov's construction and Brzozowski's minimization).
+[![Swift 5.9+](https://img.shields.io/badge/Swift-5.9%2B-orange.svg)](https://swift.org)  
+[![Platforms](https://img.shields.io/badge/platforms-macOS%2012%20%7C%20iOS%2014-blue.svg)](https://developer.apple.com/swift/)  
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)  
 
+---
 
-Here is a complete architecture. I've added a few enhancements to make it robust:
-.any Node: Helpful for substring matching (acts like .) to consume arbitrary prefixes dynamically.
-    `derivative` (Antimirov Partial Derivatives): Unlike Brzozowski's derivative, which returns a single regex (a DFA state), Antimirov's returns a Set of expressions. This maps precisely to the multiple active paths in an ε-free NFA.
-Capture Traversal: As `derivative` computes transitions, it also returns a payload of active capture group IDs (Set<Int>) that consumed the character, elegantly solving nested captures.
-Automaton Data Structure: To do Brzozowski's minimization, we must define an explicit Finite State Automaton graph.
+## Features
+- **Antimirov Engine**: Uses partial derivatives to simulate NFA transitions without ε-closures.
+- **Dynamic Capture**: Handles nested capture groups and dynamic backreferences.
+- **Brzozowski Minimization**: Includes a native implementation of DFA minimization via the double-reversal `det(rev(det(rev(A))))` algorithm.
+- **Leftmost-Longest Matching**: Implemented via NFA state-tracking that respects longest-match greedy semantics.
+- **Streaming I/O**: Efficiently processes files using Swift’s `AsyncSequence` for line-by-line matching.
+
+---
+
+## Installation
+
+Add the package to your `Package.swift` dependencies:
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/hakkabon/SwiftGrep.git", branch: "main"),
+],
+targets: [
+    .target(
+        name: "YourTarget",
+        dependencies: [
+            .product(name: "SwiftGrep", package: "SwiftGrep"),
+        ]
+    ),
+]
+```
+
+Or build the CLI binary:
+```bash
+
+swift build -c release
+./.build/release/sgrep "a(b|c)*" your_file.txt
+```
+
+---
+
+## License
+
+MIT License — see [LICENSE](LICENSE) for details.  
