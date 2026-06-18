@@ -12,29 +12,23 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.2.0"),
-        .package(url: "https://github.com/hakkabon/GrammarTokenizer.git", branch: "main"),
     ],
     targets: [
         .target(
             name: "SwiftGrep",
             dependencies: [
-                .product(name: "Tokenizer", package: "GrammarTokenizer"),
             ],
             path: "Sources/SwiftGrep",
         ),
         .testTarget(
             name: "SwiftGrepTests",
-            dependencies: [
-                "SwiftGrep",
-                .product(name: "Tokenizer", package: "GrammarTokenizer"),
-            ]
+            dependencies: ["SwiftGrep"]
         ),
         .executableTarget(
             name: "sgrep",
             dependencies: [
                 "SwiftGrep",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
-                .product(name: "Tokenizer", package: "GrammarTokenizer"),
             ]
         ),
     ]

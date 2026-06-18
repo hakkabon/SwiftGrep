@@ -13,8 +13,8 @@ import Foundation
 /// an active state simulator to perform substring matching.
 
 public struct MatchResult {
-    let range: Range<String.Index>
-    let captures: [Int: String]
+    public let range: Range<String.Index>
+    public let captures: [Int: String]
 }
 
 /// To implement Advanced Visual Output (color highlighting), we need to
