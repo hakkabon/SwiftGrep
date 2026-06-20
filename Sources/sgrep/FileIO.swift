@@ -16,15 +16,25 @@ extension RegexEngine {
     }
 }
 
-func processFile(url: URL, engine: RegexEngine, showLineNumbers: Bool) async throws {
+func processFile(url: URL, engine: RegexEngine, showLineNumbers: Bool, highlight: Bool) async throws {
     var lineNumber = 1
     // Asynchronously reads the file line-by-line with minimal memory footprint
     for try await line in url.lines {
-        if engine.hasMatch(in: line) {
-            if showLineNumbers {
-                print("\(lineNumber): \(line)")
-            } else {
-                print(line)
+        if highlight {
+            if let result = engine.firstMatch(in: line) {
+                if showLineNumbers {
+                    print("\(lineNumber): \(line.highlighted(in: result.range))")
+                } else {
+                    print(line.highlighted(in: result.range))
+                }
+            }
+        } else {
+            if engine.hasMatch(in: line) {
+                if showLineNumbers {
+                    print("\(lineNumber): \(line)")
+                } else {
+                    print(line)
+                }
             }
         }
         lineNumber += 1

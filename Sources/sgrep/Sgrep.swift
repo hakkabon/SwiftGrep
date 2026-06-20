@@ -26,27 +26,37 @@ struct SwiftGrep: AsyncParsableCommand {
     @Flag(name: .shortAndLong, help: "Prefix each line of output with the 1-based line number.")
     var lineNumber: Bool = false
     
+    @Flag(name: [.long, .customShort("H")], help: "Highlight matched text. Name of short option being '-H' (capital H).")
+    var highlight: Bool = false
+
     @Flag(name: .shortAndLong, help: "Invert the sense of matching, to select non-matching lines.")
     var invertMatch: Bool = false
 
     mutating func run() async throws {
-        // 1. Parse the string pattern into your AST
+        // Parse the string pattern into your AST
         let ast = try RegexParser.parse(pattern)
         
-        // 2. Initialize your NFA / Matching Engine
+        // Initialize your NFA / Matching Engine
         let engine = RegexEngine(ast)
 
-        // 3. Process Streams
+        // Process Streams
         if files.isEmpty {
             // Read from standard input (e.g., `cat log.txt | sgrep "error"`)
             var currentLineNumber = 1
             var iterator = FileHandle.standardInput.bytes.lines.makeAsyncIterator()
             
             while let line = try await iterator.next() {
-                let matched = engine.hasMatch(in: line)
-                if matched != invertMatch { // XOR logic for invert match flag
-                    let prefix = lineNumber ? "\(currentLineNumber):" : ""
-                    print("\(prefix)\(line)")
+                if highlight {
+                    if let result = engine.firstMatch(in: line), !invertMatch {
+                        let prefix = lineNumber ? "\(currentLineNumber):" : ""
+                        print("\(prefix)\(line.highlighted(in: result.range))")
+                    }
+                } else {
+                    let matched = engine.hasMatch(in: line)
+                    if matched != invertMatch { // XOR logic for invert match flag
+                        let prefix = lineNumber ? "\(currentLineNumber):" : ""
+                        print("\(prefix)\(line)")
+                    }
                 }
                 currentLineNumber += 1
             }
@@ -55,7 +65,7 @@ struct SwiftGrep: AsyncParsableCommand {
             for file in files {
                 let fileURL = URL(fileURLWithPath: file)
                 do {
-                    try await processFile(url: fileURL, engine: engine, showLineNumbers: lineNumber)
+                    try await processFile(url: fileURL, engine: engine, showLineNumbers: lineNumber, highlight: highlight)
                 } catch {
                     FileHandle.standardError.write("sgrep: \(file): No such file or directory\n".data(using: .utf8)!)
                 }
