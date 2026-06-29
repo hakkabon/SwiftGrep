@@ -46,15 +46,12 @@ struct SwiftGrep: AsyncParsableCommand {
             var iterator = FileHandle.standardInput.bytes.lines.makeAsyncIterator()
             
             while let line = try await iterator.next() {
-                if highlight {
-                    if let result = engine.firstMatch(in: line), !invertMatch {
-                        let prefix = lineNumber ? "\(currentLineNumber):" : ""
+                let matched = engine.hasMatch(in: line)
+                if matched != invertMatch {
+                    let prefix = lineNumber ? "\(currentLineNumber):" : ""
+                    if highlight, !invertMatch, let result = engine.firstMatch(in: line) {
                         print("\(prefix)\(line.highlighted(in: result.range))")
-                    }
-                } else {
-                    let matched = engine.hasMatch(in: line)
-                    if matched != invertMatch { // XOR logic for invert match flag
-                        let prefix = lineNumber ? "\(currentLineNumber):" : ""
+                    } else {
                         print("\(prefix)\(line)")
                     }
                 }
@@ -65,7 +62,7 @@ struct SwiftGrep: AsyncParsableCommand {
             for file in files {
                 let fileURL = URL(fileURLWithPath: file)
                 do {
-                    try await processFile(url: fileURL, engine: engine, showLineNumbers: lineNumber, highlight: highlight)
+                    try await processFile(url: fileURL, engine: engine, showLineNumbers: lineNumber, highlight: highlight, invertMatch: invertMatch)
                 } catch {
                     FileHandle.standardError.write("sgrep: \(file): No such file or directory\n".data(using: .utf8)!)
                 }

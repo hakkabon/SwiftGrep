@@ -16,6 +16,25 @@ import Foundation
 /// First, we set up the AST with intelligent constructors that aggressively simplify
 /// the expression to prevent states from blowing up (especially ∅ dead paths).
 
+public enum CharacterClassComponent: Hashable, CustomStringConvertible {
+    case single(Character)
+    case range(ClosedRange<Character>)
+
+    public func contains(_ char: Character) -> Bool {
+        switch self {
+        case .single(let c): return c == char
+        case .range(let r): return r.contains(char)
+        }
+    }
+
+    public var description: String {
+        switch self {
+        case .single(let c): return String(c)
+        case .range(let r): return "\(r.lowerBound)-\(r.upperBound)"
+        }
+    }
+}
+
 public indirect enum Regex: Hashable {
     case empty
     case epsilon
@@ -26,6 +45,9 @@ public indirect enum Regex: Hashable {
     case negation(Regex)
     case concat(Regex, Regex)
     case star(Regex)
+    case plus(Regex)
+    case question(Regex)
+    case characterClass(isNegated: Bool, Set<CharacterClassComponent>)
     case capture(id: Int, Regex)
     case backreference(id: Int)
     
@@ -53,6 +75,25 @@ public indirect enum Regex: Hashable {
         if op == .empty { return .empty }
         return .capture(id: id, op)
     }
+
+    public static func pl(_ op: Regex) -> Regex {
+        if op == .empty { return .empty }
+        if op == .epsilon { return .epsilon }
+        return .plus(op)
+    }
+
+    public static func qn(_ op: Regex) -> Regex {
+        if op == .empty { return .epsilon }
+        if op == .epsilon { return .epsilon }
+        return .question(op)
+    }
+
+    public static func cc(isNegated: Bool, _ components: Set<CharacterClassComponent>) -> Regex {
+        if components.isEmpty {
+            return isNegated ? .any : .empty
+        }
+        return .characterClass(isNegated: isNegated, components)
+    }
 }
 
 extension Regex: CustomStringConvertible {
@@ -68,6 +109,12 @@ extension Regex: CustomStringConvertible {
         case .negation(let r): return "~\(r)"
         case .concat(let l, let r): return "\(l)\(r)"
         case .star(let r): return "(\(r))*"
+        case .plus(let r): return "(\(r))+"
+        case .question(let r): return "(\(r))?"
+        case .characterClass(let isNegated, let components):
+            let negatedPrefix = isNegated ? "^" : ""
+            let body = components.map(\.description).sorted().joined()
+            return "[\(negatedPrefix)\(body)]"
         case .capture(let id, let r): return "[\(id):\(r)]"
         case .backreference(let id): return "\\\(id)"
         }

@@ -14,8 +14,12 @@ public enum Token: Equatable, CustomStringConvertible {
     case dot        // .
     case pipe       // |
     case star       // *
+    case plus       // +
+    case question   // ?
     case lParen     // (
     case rParen     // )
+    case lBracket   // [
+    case rBracket   // ]
     case backref(Int) // \1, \2, etc.
     case eof
 
@@ -25,10 +29,31 @@ public enum Token: Equatable, CustomStringConvertible {
         case .dot: return "."
         case .pipe: return "|"
         case .star: return "*"
+        case .plus: return "+"
+        case .question: return "?"
         case .lParen: return "("
         case .rParen: return ")"
+        case .lBracket: return "["
+        case .rBracket: return "]"
         case .backref(let id): return "\\\(id)"
         case .eof: return "EOF"
+        }
+    }
+
+    public var literalCharacter: Character? {
+        switch self {
+        case .char(let c): return c
+        case .dot: return "."
+        case .pipe: return "|"
+        case .star: return "*"
+        case .plus: return "+"
+        case .question: return "?"
+        case .lParen: return "("
+        case .rParen: return ")"
+        case .lBracket: return "["
+        case .rBracket: return "]"
+        case .backref(let id): return Character(String(id))
+        case .eof: return nil
         }
     }
 }
@@ -36,6 +61,7 @@ public enum Token: Equatable, CustomStringConvertible {
 public enum ParseError: Error, CustomStringConvertible {
     case unexpectedToken(String)
     case missingClosingParen
+    case missingClosingBracket
     case invalidEscapeSequence
     case nothingToRepeat
     
@@ -43,6 +69,7 @@ public enum ParseError: Error, CustomStringConvertible {
         switch self {
         case .unexpectedToken(let msg): return "Parse Error: Unexpected token '\(msg)'"
         case .missingClosingParen: return "Parse Error: Missing closing parenthesis ')'"
+        case .missingClosingBracket: return "Parse Error: Missing closing bracket ']'"
         case .invalidEscapeSequence: return "Parse Error: Invalid escape sequence"
         case .nothingToRepeat: return "Parse Error: Quantifier '*' requires a preceding element"
         }
@@ -60,8 +87,12 @@ public class Tokenizer {
             case ".": tokens.append(.dot)
             case "|": tokens.append(.pipe)
             case "*": tokens.append(.star)
+            case "+": tokens.append(.plus)
+            case "?": tokens.append(.question)
             case "(": tokens.append(.lParen)
             case ")": tokens.append(.rParen)
+            case "[": tokens.append(.lBracket)
+            case "]": tokens.append(.rBracket)
             case "\\":
                 index = input.index(after: index)
                 guard index < input.endIndex else { throw ParseError.invalidEscapeSequence }

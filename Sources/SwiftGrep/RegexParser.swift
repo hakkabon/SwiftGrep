@@ -52,7 +52,7 @@ public class RegexParser {
     }
     
     /// Rule 2: Concatenation
-    /// Concat -> Star (Star)*
+    /// Concat -> Quantifier (Quantifier)*
     private func parseConcat() throws -> Regex {
         var nodes: [Regex] = []
         
@@ -62,7 +62,7 @@ public class RegexParser {
             if token == .eof || token == .pipe || token == .rParen {
                 break
             }
-            nodes.append(try parseStar())
+            nodes.append(try parseQuantifier())
         }
         
         // Empty sequence becomes epsilon (e.g., empty parens `()` or `a|` -> `a|ε`)
@@ -72,23 +72,36 @@ public class RegexParser {
         return nodes[1...].reduce(nodes[0]) { Regex.con($0, $1) }
     }
     
-    /// Rule 3: Quantifier (Star)
-    /// Star -> Base ("*")*
-    private func parseStar() throws -> Regex {
-        // Prevent `*` from appearing without a base element
-        if peek() == .star { throw ParseError.nothingToRepeat }
+    /// Rule 3: Quantifiers
+    /// Quantifier -> Base ("*" | "+" | "?")*
+    private func parseQuantifier() throws -> Regex {
+        if peek() == .star || peek() == .plus || peek() == .question {
+            throw ParseError.nothingToRepeat
+        }
         
         var node = try parseBase()
         
-        while match(.star) {
-            node = .star(node)
+        while true {
+            let token = peek()
+            if token == .star {
+                consume()
+                node = .star(node)
+            } else if token == .plus {
+                consume()
+                node = Regex.pl(node)
+            } else if token == .question {
+                consume()
+                node = Regex.qn(node)
+            } else {
+                break
+            }
         }
         
         return node
     }
     
     /// Rule 4: Base Elements
-    /// Base -> Char | "." | "(" Alt ")" | "\" Digit
+    /// Base -> Char | "." | "(" Alt ")" | "\" Digit | "[" Class "]"
     private func parseBase() throws -> Regex {
         let token = consume()
         
@@ -114,10 +127,62 @@ public class RegexParser {
                 throw ParseError.missingClosingParen
             }
             return .capture(id: captureId, innerAst)
+
+        case .lBracket:
+            return try parseCharacterClass()
             
         default:
             throw ParseError.unexpectedToken(token.description)
         }
+    }
+
+    private func parseCharacterClass() throws -> Regex {
+        // We have already consumed `.lBracket`
+        var isNegated = false
+        if case .char("^") = peek() {
+            consume()
+            isNegated = true
+        }
+        
+        var components = Set<CharacterClassComponent>()
+        
+        while peek() != .rBracket {
+            let token = peek()
+            if token == .eof {
+                throw ParseError.missingClosingBracket
+            }
+            
+            guard let char = token.literalCharacter else {
+                throw ParseError.unexpectedToken(token.description)
+            }
+            
+            consume()
+            
+            if case .char("-") = peek() {
+                // Peek next token after the dash
+                if pos < tokens.count - 1 {
+                    let nextNextToken = tokens[pos + 1]
+                    if nextNextToken != .rBracket, let endChar = nextNextToken.literalCharacter {
+                        consume() // consume `.char("-")`
+                        consume() // consume `endChar`
+                        
+                        guard char <= endChar else {
+                            throw ParseError.unexpectedToken("Invalid character range \(char)-\(endChar)")
+                        }
+                        components.insert(.range(char...endChar))
+                        continue
+                    }
+                }
+            }
+            
+            components.insert(.single(char))
+        }
+        
+        guard match(.rBracket) else {
+            throw ParseError.unexpectedToken(peek().description)
+        }
+        
+        return Regex.cc(isNegated: isNegated, components)
     }
 }
 

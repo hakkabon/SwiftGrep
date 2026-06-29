@@ -137,19 +137,24 @@ print("Minimal DFA states:", dfa.states.count)
 | `.`           | Any single character                                 | `c.t` matches `"cat"`, `"cot"`, …       |  
 | `R1\|R2`      | Alternation                                          | `cat\|dog`                             |  
 | `R*`          | Zero-or-more repetition (Kleene star)                 | `ab*c` matches `"ac"`, `"abc"`, `"abbc"` |  
+| `R+`          | One-or-more repetition                                | `a+` matches `"a"`, `"aa"`, `"aaa"`, … but not `""` |  
+| `R?`          | Zero-or-one (optional)                                | `ab?c` matches `"ac"` and `"abc"` |  
+| `[abc]`       | Character class — matches any one listed character    | `[aeiou]` matches any vowel |  
+| `[a-z]`       | Character range inside a class                        | `[0-9]` matches any digit |  
+| `[^abc]`      | Negated character class — matches any character *not* listed | `[^0-9]+` matches runs of non-digits |  
 | `(R)`         | Capturing group, numbered left-to-right by `(`        | `(ab)(cd)` — group 1 is `ab`, group 2 is `cd` |  
 | `\1` … `\9`   | Backreference to capture group 1–9                    | `(a\|b)\1` matches `"aa"` or `"bb"`, not `"ab"` |  
 | `\x`          | Escaped literal, for any `x` that is not a non-zero digit | `\.` matches a literal `"."`; `\\` matches `"\"` |  
 
-Everything else in the input string is taken as a literal character — there is no special meaning for, e.g., `[`, `]`, `^`, `$`, `+`, `?`, or `{`/`}` today (see below).
+Everything else in the input string is taken as a literal character — there is no special meaning for, e.g., `^`, `$`, or `{`/`}` today (see below).
 
 ### Not Yet Supported
 
 The `Regex` AST already has cases for some operators that the textual grammar can't yet produce, and the textual grammar itself has clear gaps. Both are good entry points for contribution:
 
-- Quantifiers `+`, `?`, and bounded repetition `{m,n}` (today, only `*` exists; `a+` must be written as `aa*`).
-- Character classes `[abc]`, `[^abc]`, and ranges `[a-z]`.
+- Bounded repetition `{m,n}`.
 - Anchors `^` and `$`.
+- Shorthand character classes `\d`, `\w`, `\s` and their negations.
 - Multi-digit backreferences: `\10` tokenizes as `\1` followed by a literal `"0"`, not "backreference 10" (see [ALGORITHMS.md](ALGORITHMS.md) for why, and [Tests](#testing) for a regression test that pins this behavior down).
 - `Regex.intersection` and `Regex.negation` exist as AST cases for *programmatic* construction (e.g. if you're building ASTs by hand rather than through `RegexParser`), but `derivative(with:env:)` currently calls `fatalError()` for both — there is no textual syntax that reaches them, and you should not call `buildNFA` or `RegexEngine` on an AST that contains them. See [ALGORITHMS.md](ALGORITHMS.md) for *why* this is a harder problem than it looks.
 
@@ -201,12 +206,11 @@ The full derivation, the relevant theorems and their proofs sketches, worked exa
 ## Known Limitations & Roadmap
 
 - **Single-digit backreferences only.** `\1`–`\9` are supported; `\10` is tokenized as `\1` followed by a literal `"0"` character, not as "backreference 10." (Verified by `TokenizerTests.testMultiDigitBackreferenceIsNotSupported`.)
-- **No character classes, bounded quantifiers, or anchors** in the textual grammar yet (the underlying `Regex` AST has room to grow; the bottleneck is `Tokenizer`/`RegexParser`).
+- **No bounded quantifiers or anchors** in the textual grammar yet. `{m,n}` bounded repetition, `^` (start-of-line), and `$` (end-of-line) are not implemented.
 - **`.intersection` / `.negation` will crash the matcher.** They exist on the `Regex` enum for programmatic AST construction, but `derivative(with:env:)` has no implementation for them yet (`fatalError`). There is no path from `RegexParser` that produces them, so this only matters if you build a `Regex` value by hand.
 - **Repeated-capture semantics differ from PCRE/Perl.** For a pattern like `(a)*` matched against `"aaa"`, this engine's capture environment *accumulates* the text consumed across every iteration of the group (`captures[1] == "aaa"`), rather than keeping only the most recent iteration (`captures[1] == "a"` in PCRE/Perl). This is a deliberate consequence of how the capture environment is threaded through `derivative(...)`, not a bug — but it's worth knowing if you're porting patterns from another engine. See `MatchingCornerCaseTests.testRepeatedCaptureGroupAccumulatesAcrossIterations`.
 - **Forward/dangling backreferences match vacuously.** `\1(a)` is accepted by the parser (no "undefined group" error) and, because an unset capture is treated as nullable, the leading `\1` is simply skipped the first time through. Most PCRE-style engines either reject this pattern statically or always fail it at match time. See `MatchingCornerCaseTests.testForwardBackreferenceIsTreatedAsVacuouslyNullable`.
 - **`buildNFA`/`minimized()` are for the backreference-free subset only.** Any pattern using `\1`–`\9` must go through `RegexEngine`; the static `Automaton` machinery has no notion of a capture environment.
-- **The CLI doesn't highlight matches yet.** `String.highlighted(in:)` exists and is tested, but neither `Sgrep.swift` nor `FileIO.swift` calls it — `sgrep` currently prints matched lines in plain text. Wiring this up (behind a `--color` flag, perhaps) is a good first contribution.
 - **`Automaton.minimized()` can be exponential in the worst case**, since each of its two determinization passes is a powerset construction. This is a known, accepted property of Brzozowski's algorithm (not a bug) — see [ALGORITHMS.md](ALGORITHMS.md) for the tradeoff against, e.g., Hopcroft's partition-refinement algorithm.
 
 ---
@@ -217,7 +221,7 @@ The full derivation, the relevant theorems and their proofs sketches, worked exa
 swift test
 ```
 
-The suite mixes `XCTest` and the newer `Testing` framework (both are supported side-by-side by the same test target). Coverage spans: AST smart-constructor simplification, nullability, the tokenizer/lexer, parser precedence and error paths, substring/leftmost-longest matching, nested captures and backreferences, NFA construction, and Brzozowski minimization — including several language-equivalence checks that simulate an NFA and its minimized DFA side-by-side and assert they accept exactly the same strings.
+The suite mixes `XCTest` and the newer `Testing` framework (both are supported side-by-side by the same test target). Coverage spans: AST smart-constructor simplification, nullability, the tokenizer/lexer, parser precedence and error paths, substring/leftmost-longest matching, nested captures and backreferences, NFA construction, Brzozowski minimization, character classes (including negation and ranges), and the `+`/`?` quantifiers — including several language-equivalence checks that simulate an NFA and its minimized DFA side-by-side and assert they accept exactly the same strings.
 
 ---
 

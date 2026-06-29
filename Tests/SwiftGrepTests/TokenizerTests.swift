@@ -91,29 +91,28 @@ final class TokenizerTests: XCTestCase {
         XCTAssertEqual(tokens, [.backref(1), .char("2"), .eof])
     }
 
-    // MARK: - Documenting the lack of character-class support
-
-    func testBracketsAreLiteralCharactersNotCharacterClasses() throws {
-        // `SwiftGrep` has no concept of a bracket expression: '[' and ']' are
-        // ordinary literal characters, like any other letter. This is the reason
-        // `RegexAutomataTests.testBackrefMismatch` (in RegularExpressionTests.swift),
-        // whose pattern is "([ab])\1", doesn't actually test a character-class-vs-
-        // backreference mismatch as its comment suggests — "[ab]" is captured and
-        // matched against literally, not used as a character class. This test
-        // isolates and documents the real behavior.
+    // MARK: - Documenting the new character-class support
+ 
+    func testBracketsAreTokenizedAsBrackets() throws {
+        // Now that `SwiftGrep` supports character classes, '[' and ']' are
+        // tokenized as .lBracket and .rBracket.
         let tokens = try Tokenizer.tokenize("[ab]")
-        XCTAssertEqual(tokens, [.char("["), .char("a"), .char("b"), .char("]"), .eof])
+        XCTAssertEqual(tokens, [.lBracket, .char("a"), .char("b"), .rBracket, .eof])
     }
-
+ 
     // MARK: - Token.description
-
+ 
     func testTokenDescriptions() {
         XCTAssertEqual(Token.eof.description, "EOF")
         XCTAssertEqual(Token.dot.description, ".")
         XCTAssertEqual(Token.pipe.description, "|")
         XCTAssertEqual(Token.star.description, "*")
+        XCTAssertEqual(Token.plus.description, "+")
+        XCTAssertEqual(Token.question.description, "?")
         XCTAssertEqual(Token.lParen.description, "(")
         XCTAssertEqual(Token.rParen.description, ")")
+        XCTAssertEqual(Token.lBracket.description, "[")
+        XCTAssertEqual(Token.rBracket.description, "]")
         XCTAssertEqual(Token.char("x").description, "x")
         XCTAssertEqual(Token.backref(3).description, "\\3")
     }

@@ -22,8 +22,9 @@ extension Regex {
     
     public func isNullable(env: [Int: String]) -> Bool {
         switch self {
-        case .empty, .any, .symbol: return false
-        case .epsilon, .star: return true
+        case .empty, .any, .symbol, .characterClass: return false
+        case .epsilon, .star, .question: return true
+        case .plus(let r): return r.isNullable(env: env)
         case .alternation(let s): return s.contains { $0.isNullable(env: env) }
         case .intersection(let s): return s.allSatisfy { $0.isNullable(env: env) }
         case .negation(let r): return !r.isNullable(env: env)
@@ -44,6 +45,11 @@ extension Regex {
             
         case .symbol(let char):
             return char == c ? [DerivResult(regex: .epsilon, captures: [])] : []
+
+        case .characterClass(let isNegated, let components):
+            let matches = components.contains { $0.contains(c) }
+            let isMatch = isNegated ? !matches : matches
+            return isMatch ? [DerivResult(regex: .epsilon, captures: [])] : []
             
         case .backreference(let id):
             guard let saved = env[id], !saved.isEmpty else { return [] }
@@ -90,6 +96,19 @@ extension Regex {
                 }
             }
             return result
+
+        case .plus(let op):
+            var result = Set<DerivResult>()
+            for d in op.derivative(with: c, env: env) {
+                let conRegex = Regex.con(d.regex, .star(op))
+                if conRegex != .empty {
+                    result.insert(DerivResult(regex: conRegex, captures: d.captures))
+                }
+            }
+            return result
+
+        case .question(let op):
+            return op.derivative(with: c, env: env)
             
         case .intersection(_), .negation(_):
             // Fallback: pure NFA isn't natively closed under negation without subset determinization.

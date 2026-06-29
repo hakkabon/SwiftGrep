@@ -162,9 +162,9 @@ final class RegexAutomataTests: XCTestCase {
         let nfa = pattern.buildNFA(alphabet: alphabet)
         let minimalDfa = nfa.minimized()
         
-        // a* DFA with alphabet {a,b} should have exactly 2 states:
-        // 1 accepting state (looping on 'a'), and 1 dead state (absorbing 'b')
-        XCTAssertEqual(minimalDfa.states.count, 2, "Brzozowski minimization should reduce a*a* to an optimal 2-state DFA")
+        // a* DFA with alphabet {a,b} should have exactly 1 state:
+        // 1 accepting state (looping on 'a'), and no dead state (as dead states are not represented in the partial DFA)
+        XCTAssertEqual(minimalDfa.states.count, 1, "Brzozowski minimization should reduce a*a* to an optimal 1-state DFA")
         
         // Assert Determinism: Each state should have exactly one target for each character in the alphabet
         for state in minimalDfa.states {
